@@ -48,31 +48,35 @@
 
     // 3. Fungsi setelah scan berhasil
     function onScanSuccess(decodedText, decodedResult) {
-        // Hentikan kamera SEKETIKA
-        if (qrScanner.isScanning) {
-            qrScanner.stop();
-        }
-        
-        statusEl.textContent = `Mengirim: ${decodedText}`;
-
-        // 4. Kirim data ke Web App Apps Script
-        fetch(GAS_URL, {
-            method: "POST",
-            mode: 'no-cors', // Penting untuk Apps Script Web App
-            body: JSON.stringify({
-                action: "receiveScan", // Tambahkan 'action' agar mudah diidentifikasi
-                code: decodedText
-            })
-        })
-        .then(() => {
-            statusEl.textContent = "Berhasil! Anda bisa menutup tab ini.";
-            // 5. Tutup tab setelah 1 detik
-            setTimeout(() => window.close(), 1000);
-        })
-        .catch(err => {
-            statusEl.textContent = `Gagal mengirim data. Error: ${err}`;
-        });
+    if (qrScanner.isScanning) {
+        qrScanner.stop();
     }
+    
+    statusEl.textContent = `Mengirim: ${decodedText}...`;
+
+    // Gunakan URLSearchParams agar kompatibel dengan 'no-cors'
+    // Apps Script akan menerima ini di e.postData.contents sebagai string
+    fetch(GAS_URL, {
+        method: "POST",
+        mode: 'no-cors', 
+        headers: {
+            'Content-Type': 'text/plain' // Hindari masalah pre-flight CORS
+        },
+        body: JSON.stringify({
+            action: "receiveScan",
+            code: decodedText
+        })
+    })
+    .then(() => {
+        statusEl.innerHTML = "<b style='color:#10b981'>BERHASIL!</b><br>Data sudah terkirim. Silakan kembali ke tab Utama.";
+        // Jangan paksa window.close() jika sering gagal, biarkan user tutup manual
+        // atau beri waktu lebih lama
+        setTimeout(() => { window.close(); }, 2000);
+    })
+    .catch(err => {
+        statusEl.textContent = `Gagal mengirim: ${err}`;
+    });
+}
 </script>
 
 </body>
