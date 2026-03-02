@@ -48,35 +48,28 @@
 
     // 3. Fungsi setelah scan berhasil
     function onScanSuccess(decodedText, decodedResult) {
-    if (qrScanner.isScanning) {
-        qrScanner.stop();
-    }
+        if (qrScanner.isScanning) qrScanner.stop();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const GAS_URL = urlParams.get('gas_url');
+        const petugas = urlParams.get('petugas'); // Ambil nama petugas dari URL
     
-    statusEl.textContent = `Mengirim: ${decodedText}...`;
-
-    // Gunakan URLSearchParams agar kompatibel dengan 'no-cors'
-    // Apps Script akan menerima ini di e.postData.contents sebagai string
-    fetch(GAS_URL, {
-        method: "POST",
-        mode: 'no-cors', 
-        headers: {
-            'Content-Type': 'text/plain' // Hindari masalah pre-flight CORS
-        },
-        body: JSON.stringify({
-            action: "receiveScan",
-            code: decodedText
+        statusEl.textContent = `Mengirim hasil scan untuk ${petugas}...`;
+    
+        fetch(GAS_URL, {
+            method: "POST",
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: "receiveScan",
+                code: decodedText,
+                user_id: petugas // Kirim balik nama petugas sebagai kunci
+            })
         })
-    })
-    .then(() => {
-        statusEl.innerHTML = "<b style='color:#10b981'>BERHASIL!</b><br>Data sudah terkirim. Silakan kembali ke tab Utama.";
-        // Jangan paksa window.close() jika sering gagal, biarkan user tutup manual
-        // atau beri waktu lebih lama
-        setTimeout(() => { window.close(); }, 2000);
-    })
-    .catch(err => {
-        statusEl.textContent = `Gagal mengirim: ${err}`;
-    });
-}
+        .then(() => {
+            statusEl.innerHTML = "<b style='color:lime'>BERHASIL!</b><br>Silakan kembali ke tab Utama.";
+            setTimeout(() => window.close(), 1500);
+        });
+    }
 </script>
 
 </body>
