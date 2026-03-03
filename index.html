@@ -1,74 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Scan QR</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; text-align: center; background: #333; color: white; margin:0; padding:20px; }
-  #reader { width: 90vw; max-width: 400px; margin: 20px auto; border: 2px solid white; border-radius: 10px; }
-  h2 { font-size: 1.2rem; }
-  p { font-size: 0.9rem; opacity: 0.8; }
-</style>
+    <title>MJT Smart Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            background: #1a1a1a; 
+            color: white; 
+            margin: 0; 
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100vh;
+        }
+        #reader { 
+            width: 100%; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            border: none !important;
+        }
+        /* Custom UI untuk mempercantik tampilan di dalam Iframe */
+        #reader__scan_region { background: #000; }
+        #reader__dashboard { padding: 20px !important; background: #1a1a1a; }
+        
+        .info-box {
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            margin: 10px;
+            border-radius: 8px;
+        }
+        h2 { font-size: 1.1rem; margin-bottom: 5px; color: #00ff88; }
+        p { font-size: 0.85rem; margin: 5px 0; opacity: 0.8; }
+        .status-success { color: #00ff88; font-weight: bold; }
+    </style>
 </head>
 <body>
 
-<h2>Arahkan kamera ke QR Code</h2>
-<p id="status">Memulai kamera...</p>
+<div class="info-box">
+    <h2 id="title-petugas">Scanner Aktif</h2>
+    <p id="status">Menginisialisasi kamera...</p>
+</div>
+
 <div id="reader"></div>
 
 <script>
     const statusEl = document.getElementById('status');
+    const titleEl = document.getElementById('title-petugas');
     let qrScanner = null;
 
-    // 1. Ambil URL Web App dari parameter URL
+    // 1. Ambil Parameter dari URL
     const urlParams = new URLSearchParams(window.location.search);
     const GAS_URL = urlParams.get('gas_url');
+    const petugas = urlParams.get('petugas') || "Petugas";
+    const isEmbed = urlParams.get('embed') === 'true';
 
-    if (!GAS_URL) {
-        statusEl.textContent = "ERROR: URL Tujuan tidak ditemukan.";
-        statusEl.style.color = 'red';
+    titleEl.textContent = `Petugas: ${petugas}`;
+
+    if (!GAS_URL && !isEmbed) {
+        statusEl.textContent = "ERROR: Konfigurasi URL tidak lengkap.";
+        statusEl.style.color = '#ff4444';
     } else {
+        // Mulai Scanner
         qrScanner = new Html5Qrcode("reader");
         startScanner();
     }
 
-    // 2. Fungsi untuk memulai scanner
     function startScanner() {
+        const config = { 
+            fps: 15, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0 
+        };
+
         qrScanner.start(
             { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            onScanSuccess, // Fungsi jika berhasil
-            (errorMessage) => { /* Abaikan error tidak ketemu QR */ }
-        ).catch((err) => {
-            statusEl.textContent = `Gagal memulai kamera: ${err}`;
-            statusEl.style.color = 'orange';
+            config,
+            onScanSuccess
+        ).then(() => {
+            statusEl.textContent = "Kamera Ready - Dekatkan ke Barcode";
+        }).catch((err) => {
+            statusEl.textContent = "Gagal akses kamera. Pastikan izin diberikan.";
+            statusEl.style.color = '#ffbb00';
         });
     }
 
-    // 3. Fungsi setelah scan berhasil
-    function onScanSuccess(decodedText, decodedResult) {
-        if (qrScanner.isScanning) qrScanner.stop();
+    function onScanSuccess(decodedText) {
+        // Matikan scanner segera setelah terdeteksi agar tidak double scan
+        qrScanner.pause(true);
         
-        const urlParams = new URLSearchParams(window.location.search);
-        const GAS_URL = urlParams.get('gas_url');
-        const petugas = urlParams.get('petugas'); // Ambil nama petugas dari URL
-    
-        statusEl.textContent = `Mengirim hasil scan untuk ${petugas}...`;
-    
-        fetch(GAS_URL, {
-            method: "POST",
-            mode: 'no-cors',
-            body: JSON.stringify({
-                action: "receiveScan",
-                code: decodedText,
-                user_id: petugas // Kirim balik nama petugas sebagai kunci
-            })
-        })
-        .then(() => {
-            statusEl.innerHTML = "<b style='color:lime'>BERHASIL!</b><br>Silakan kembali ke tab Utama.";
-            setTimeout(() => window.close(), 1500);
-        });
+        statusEl.innerHTML = `<span class="status-success">TERDETEKSI: ${decodedText}</span>`;
+        
+        // --- LOGIKA 1: KIRIM KE IFRAME (SOLUSI UTAMA) ---
+        // Ini akan memicu window.addEventListener('message') di IMS kamu
+        window.parent.postMessage({
+            type: 'scan_result',
+            code: decodedText,
+            petugas: petugas
+        }, '*');
+
+        // --- LOGIKA 2: BACKUP FETCH (JIKA DIBUKA DI TAB BARU) ---
+        if (!isEmbed && GAS_URL) {
+            fetch(GAS_URL, {
+                method: "POST",
+                mode: 'no-cors',
+                body: JSON.stringify({
+                    action: "receiveScan",
+                    code: decodedText,
+                    user_id: petugas
+                })
+            }).then(() => {
+                statusEl.innerHTML = "<b style='color:lime'>DATA TERKIRIM!</b><br>Menutup tab...";
+                setTimeout(() => window.close(), 1200);
+            });
+        }
+        
+        // Beri getaran jika didukung HP
+        if (navigator.vibrate) navigator.vibrate(100);
     }
 </script>
 
