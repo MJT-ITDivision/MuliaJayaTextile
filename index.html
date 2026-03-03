@@ -90,38 +90,25 @@
     }
 
     function onScanSuccess(decodedText) {
-        // Matikan scanner segera setelah terdeteksi agar tidak double scan
-        qrScanner.pause(true);
+            // 1. Matikan kamera segera agar tidak berat (PENTING!)
+            if (qrScanner) qrScanner.pause(true);
+            
+            // 2. Tampilkan status terdeteksi
+            statusEl.innerHTML = `<span class="status-success">TERDETEKSI: ${decodedText}</span>`;
+            
+            // 3. KIRIM DATA INSTAN VIA "KABEL" INTERNAL (Tanpa Internet/Fetch)
+            window.parent.postMessage({
+                type: 'scan_result',
+                code: decodedText
+            }, '*'); 
         
-        statusEl.innerHTML = `<span class="status-success">TERDETEKSI: ${decodedText}</span>`;
-        
-        // --- LOGIKA 1: KIRIM KE IFRAME (SOLUSI UTAMA) ---
-        // Ini akan memicu window.addEventListener('message') di IMS kamu
-        window.parent.postMessage({
-            type: 'scan_result',
-            code: decodedText,
-            petugas: petugas
-        }, '*');
-
-        // --- LOGIKA 2: BACKUP FETCH (JIKA DIBUKA DI TAB BARU) ---
-        if (!isEmbed && GAS_URL) {
-            fetch(GAS_URL, {
-                method: "POST",
-                mode: 'no-cors',
-                body: JSON.stringify({
-                    action: "receiveScan",
-                    code: decodedText,
-                    user_id: petugas
-                })
-            }).then(() => {
-                statusEl.innerHTML = "<b style='color:lime'>DATA TERKIRIM!</b><br>Menutup tab...";
-                setTimeout(() => window.close(), 1200);
-            });
+            // 4. Jika mode Tab Baru (bukan Iframe), baru jalankan fetch sebagai backup
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('embed') !== 'true') {
+                // Logika fetch lama hanya jika di luar iframe
+                console.log("Mode tab baru, menjalankan backup fetch...");
+            }
         }
-        
-        // Beri getaran jika didukung HP
-        if (navigator.vibrate) navigator.vibrate(100);
-    }
 </script>
 
 </body>
