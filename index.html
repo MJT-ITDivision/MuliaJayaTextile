@@ -90,24 +90,22 @@
     }
 
     function onScanSuccess(decodedText) {
-            // 1. Matikan kamera segera agar tidak berat (PENTING!)
-            if (qrScanner) qrScanner.pause(true);
+            console.log("QR Terdeteksi:", decodedText);
             
-            // 2. Tampilkan status terdeteksi
-            statusEl.innerHTML = `<span class="status-success">TERDETEKSI: ${decodedText}</span>`;
+            // 1. Matikan kamera agar HP tidak panas
+            if (qrScanner) {
+                qrScanner.pause(true);
+            }
             
-            // 3. KIRIM DATA INSTAN VIA "KABEL" INTERNAL (Tanpa Internet/Fetch)
+            // 2. KIRIM SINYAL (Kunci utama agar Modal Menutup)
+            // Pastikan type-nya sama persis dengan yang ada di setupEventListeners
             window.parent.postMessage({
                 type: 'scan_result',
                 code: decodedText
             }, '*'); 
-        
-            // 4. Jika mode Tab Baru (bukan Iframe), baru jalankan fetch sebagai backup
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('embed') !== 'true') {
-                // Logika fetch lama hanya jika di luar iframe
-                console.log("Mode tab baru, menjalankan backup fetch...");
-            }
+            
+            // Tampilkan status sebentar di layar scanner sebelum tertutup
+            statusEl.innerHTML = `<b style="color:lime">Berhasil! Mengirim data...</b>`;
         }
 </script>
 
