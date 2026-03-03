@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Scan QR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; background: #333; color: white; margin:0; padding:20px; }
+  #reader { width: 90vw; max-width: 400px; margin: 20px auto; border: 2px solid white; border-radius: 10px; }
+  h2 { font-size: 1.2rem; }
+  p { font-size: 0.9rem; opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<h2>Arahkan kamera ke QR Code</h2>
+<p id="status">Memulai kamera...</p>
+<div id="reader"></div>
+
+<script>
+    const statusEl = document.getElementById('status');
+    let qrScanner = null;
+
+    // 1. Ambil URL Web App dari parameter URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const GAS_URL = urlParams.get('gas_url');
+
+    if (!GAS_URL) {
+        statusEl.textContent = "ERROR: URL Tujuan tidak ditemukan.";
+        statusEl.style.color = 'red';
+    } else {
+        qrScanner = new Html5Qrcode("reader");
+        startScanner();
+    }
+
+    // 2. Fungsi untuk memulai scanner
+    function startScanner() {
+        qrScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onScanSuccess, // Fungsi jika berhasil
+            (errorMessage) => { /* Abaikan error tidak ketemu QR */ }
+        ).catch((err) => {
+            statusEl.textContent = `Gagal memulai kamera: ${err}`;
+            statusEl.style.color = 'orange';
+        });
+    }
+
+    // 3. Fungsi setelah scan berhasil
+    function onScanSuccess(decodedText, decodedResult) {
+        if (qrScanner.isScanning) qrScanner.stop();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const GAS_URL = urlParams.get('gas_url');
+        const petugas = urlParams.get('petugas'); // Ambil nama petugas dari URL
+    
+        statusEl.textContent = `Mengirim hasil scan untuk ${petugas}...`;
+    
+        fetch(GAS_URL, {
+            method: "POST",
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: "receiveScan",
+                code: decodedText,
+                user_id: petugas // Kirim balik nama petugas sebagai kunci
+            })
+        })
+        .then(() => {
+            statusEl.innerHTML = "<b style='color:lime'>BERHASIL!</b><br>Silakan kembali ke tab Utama.";
+            setTimeout(() => window.close(), 1500);
+        });
+    }
+</script>
+
+</body>
+</html>
